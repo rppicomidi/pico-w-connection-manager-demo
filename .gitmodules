@@ -1,0 +1,15 @@
+[submodule "lib/pico-w-connection-manager"]
+	path = lib/pico-w-connection-manager
+	url = https://github.com/rppicomidi/pico-w-connection-manager.git
+[submodule "lib/littlefs-lib"]
+	path = lib/littlefs-lib
+	url = https://github.com/rppicomidi/littlefs-lib
+[submodule "lib/parson"]
+	path = lib/parson
+	url = https://github.com/kgabis/parson
+[submodule "lib/embedded-cli"]
+	path = lib/embedded-cli
+	url = https://github.com/funbiscuit/embedded-cli
+[submodule "lib/pico-c-utilities"]
+	path = lib/pico-c-utilities
+	url = https://github.com/rppicomidi/pico-c-utilities

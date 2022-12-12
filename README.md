@@ -36,14 +36,16 @@ See the source code `ext_lib` and `lib` directories for more details
 # Getting the Source And Building the demo program
 Make sure you have installed the `pico-sdk` and that it works.
 Execute the following commands. The commands below assume that
-the `pico-sdk` is stored in `${PICO_SDK_PATH}`.
+the `pico-sdk` is stored in `${PICO_SDK_PATH}` and you want
+the `pico-w-connection-manager-demo` directory at the same
+directory level as the `pico-sdk`.
 
 ```
 export PICO_BOARD=pico_w
 cd ${PICO_SDK_PATH}/..
-git clone https://github.com/rppicomidi/pico-w-connection-manager-demo
-git submodule update --recursive
+git clone https://github.com/rppicomidi/pico-w-connection-manager-demo.git
 cd pico-w-connection-manager-demo
+git submodule update --recursive --init
 mkdir build
 cd build
 cmake ..

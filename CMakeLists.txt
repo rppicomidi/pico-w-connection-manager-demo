@@ -7,14 +7,13 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 pico_sdk_init()
 
-set(MAKE_FS_DATA_SCRIPT ${PICO_SDK_PATH}/lib/lwip/src/apps/http/makefsdata/makefsdata)
+set(MAKE_FS_DATA_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/fsdata/makefsdata)
 message("Running makefsdata script")
 execute_process(COMMAND
         perl ${MAKE_FS_DATA_SCRIPT}
         COMMAND_ECHO STDOUT
-        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/fsdata
         )
-file(RENAME fsdata.c my_fsdata.c)
 set(target_name pico-w-connection-manager-demo)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/pico-w-connection-manager)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/littlefs-lib)

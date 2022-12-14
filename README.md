@@ -1,12 +1,16 @@
 # pico-w-connection-manager-demo
-Pico W C++ class and demo CLI program to scan for SSID, handle
-connect and disconnect, read RSSI, and store SSID info in flash.
+Run an LwIP webserver on a Pico W using a C++ Pico_w_connection_manager class
+and command line interface to manage connection to the AP.
+
+The CLI program allows you to scan for SSID, handle connect and disconnect, read
+RSSI, and store SSID info in Pico W program flash using the LittleFs file system.
 
 The source code is designed so you can use the `Pico_w_connection_manager` Class
 with your own user interface. Use the `Pico_w_connection_manager_cli` Class
 as a guide. The code assumes a "super-loop" and does not use an RTOS.
 
-Note that all this code does is manage the connection. It does not attempt to launch a Web server, fetch info from the Internet, etc.
+Once the connection to the AP is active, the demo program starts a simple
+"hello, world" webserver.
 
 # Demo program
 The demo program uses a serial port console to accept user input and
@@ -17,6 +21,11 @@ The other commands are for managing the LittleFs flash file system.
 The demo program uses a UART serial port console. You will need to modify
 `CMakeLists.txt` if you wish to use the Pico-W's microUSB port as the
 serial port console. See the comments in `CMakeLists.txt`.
+
+# Web server
+The web page that the web server serves is stored in the `fs` directory. If you change
+the web page, you will need to re-run `cmake` to generate the my_fsdata.c file that
+encodes the page for the LwIP httpd app.
 
 # Dependencies
 Aside from the dependencies on the Pico C/C++ SDK, the Pico_w_connection_manager class
@@ -30,8 +39,10 @@ a small reserved amount of Pico board program flash.
 The demo program uses the following external code:
 - the `EmbeddedCli` library for the main CLI implementation
 - a `getsn()` implementation for user input of numbers and strings in response to prompts
+- the host machine must support the `perl` command in order convert the `index.html`
+file to the `my_fsdata.c` file.
 
-See the source code `ext_lib` and `lib` directories for more details
+See the source code for more details.
 
 # Getting the Source And Building the demo program
 Make sure you have installed the `pico-sdk` and that it works.
@@ -90,6 +101,23 @@ with
 #endif
 ```
 
+## On 13-dec-2022
+The `makefsdata` perl script that generates the SSI web page header does not recognize
+the `.shtml` extention that the LwIP http server requires to properly server up SSI
+pages. A quick fix is to edit the script which is found at
+`${PICO_SDK_PATH}/lib/lwip/src/apps/http/makefsdata/makefsdata`
+
+Replace
+
+```
+if($file =~ /\.html$/) {
+```
+with
+
+```
+if($file =~ /\.s?html?$/) {
+```
+See the discussion [here](https://github.com/krzmaz/lwip/commit/e15654409d14a238aec5ed4bd5516063938c9345)
 # Demo program features
 The demo prgram is designed to exercise features of the
 `pico-w-connection-manager` class, which is called "the class" below.

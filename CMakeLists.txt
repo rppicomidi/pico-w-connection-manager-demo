@@ -7,6 +7,14 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 pico_sdk_init()
 
+set(MAKE_FS_DATA_SCRIPT ${PICO_SDK_PATH}/lib/lwip/src/apps/http/makefsdata/makefsdata)
+message("Running makefsdata script")
+execute_process(COMMAND
+        perl ${MAKE_FS_DATA_SCRIPT}
+        COMMAND_ECHO STDOUT
+        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+        )
+file(RENAME fsdata.c my_fsdata.c)
 set(target_name pico-w-connection-manager-demo)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/pico-w-connection-manager)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/littlefs-lib)
@@ -33,6 +41,6 @@ target_include_directories(${target_name} PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/lib/pico-c-utilities/
 )
 
-target_link_libraries(${target_name} pico_stdlib pico_w_connection_manager)
+target_link_libraries(${target_name} pico_stdlib pico_w_connection_manager pico_lwip_http)
 pico_add_extra_outputs(${target_name})
 

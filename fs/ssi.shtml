@@ -1,0 +1,7 @@
+<!DOCTYPE html>
+<html>
+    <head> <title>Pico W</title> </head>
+    <body> <h1>Pico W</h1>
+        <p><!--#Hello--> Times <!--#counter-->!</p>
+    </body>
+</html>

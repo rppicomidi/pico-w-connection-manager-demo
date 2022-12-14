@@ -10,15 +10,17 @@
 	<body>
 		<ul class="navbar">
 			<li><a href="/">Home</a></li>
-			<!-- <li><a href="websockets">WebSockets</a></li> -->
 			<li><a class="active" href="about">About</a></li>
 		</ul>
 
 		<div class="grid main">
 			<h1>About</h1>
-			<p>This server is based on httpd from LwIP.</p>
+			<p>You are running a demo program on the Raspberry Pi Pico W that uses the Pico SDK and included LwIP
+                library to run a webserver. The program used the <code>Pico_w_connection_manager</code> C++ class to establish
+                a connection to the AP and then started a the LwIP HTTP server app that served this website.
 			<p>To enable debugging compile with flags -DLWIP_DEBUG=1 -DHTTPD_DEBUG=LWIP_DBG_ON.</p>
-			<p>For more info see <a href="https://www.nongnu.org/lwip/2_1_x/group__httpd.html">HTTP Server documentation</a>.</p>
+			<p>For more info see <a href="https://www.nongnu.org/lwip/2_1_x/group__httpd.html">HTTP server documentation</a>.</p>
+            <p>The overall web page design is based on <a href="https://github.com/lujji/esp-httpd">HTTP server with ESP8266 WebSockets</a>.</p>
 		</div>
 	</body>
 </html>

@@ -9,8 +9,10 @@ The source code is designed so you can use the `Pico_w_connection_manager` Class
 with your own user interface. Use the `Pico_w_connection_manager_cli` Class
 as a guide. The code assumes a "super-loop" and does not use an RTOS.
 
-Once the connection to the AP is active, the demo program starts a simple
-"hello, world" webserver.
+Once the connection to the AP is active, the demo program starts a webserver
+that allows you to turn the Pico W's on-board LED on or off.
+
+![](doc/Pico-w-connection-manager-home.png)
 
 # Demo program
 The demo program uses a serial port console to accept user input and
@@ -22,10 +24,38 @@ The demo program uses a UART serial port console. You will need to modify
 `CMakeLists.txt` if you wish to use the Pico-W's microUSB port as the
 serial port console. See the comments in `CMakeLists.txt`.
 
-# Web server
-The web page that the web server serves is stored in the `fs` directory. If you change
-the web page, you will need to re-run `cmake` to generate the my_fsdata.c file that
-encodes the page for the LwIP httpd app.
+# First time run
+1. Normally, the Pico W will automatically connect to the last AP to which it was
+connected. That doesn't work the first time. The first time you run the code, you will see something like the following on your terminal
+
+```
+pico-w-wifi-setup demo                                                        
+Cli is running.                                                                 
+Type "help" for a list of commands                                              
+Use backspace and tab to remove chars and autocomplete                          
+Use up and down arrows to recall previous commands                              
+> new country code XX=Worldwide                                                 
+new country code XX=Worldwide                                                   
+Version: 7.95.49 (2271bb6 CY) CRC: b7a28ef3 Date: Mon 2021-11-29 22:50:27 PST U0
+cyw43 loaded ok, mac 28:cd:c1:06:3d:29                                          
+API: 12.2                                                                       
+Data: RaspberryPi.PicoW                                                         
+Compiler: 1.29.4                                                                
+ClmImport: 1.47.1                                                               
+Customization: v5 22/06/24                                                      
+Creation: 2022-06-24 06:55:08                                                   
+No SSID specified                                                               
+failed to connect to
+```
+2. If your AP has an broadcast SSID, enter the `wifi-scan-connect` command and
+follow the prompts to connect. If your AP has a hidden SSID, use the `wifi-connect`
+command to connect.
+3. When the connection is complete, the terminal will show a `Link Up IP address=`
+message. Enter that IP address in your browser to display the home page of the
+webserver.
+
+When you toggle the switch, there will be a perceptable delay because the whole page
+reloads for each CGI request.
 
 # Dependencies
 Aside from the dependencies on the Pico C/C++ SDK, the Pico_w_connection_manager class
@@ -69,6 +99,7 @@ Load the built image into your Pico-W. If if you run into issues during testing,
 For all known issues, check the date. By the time you build this, they
 may be fixed.
 ## On 6-dec-2022
+### LwIP bug
 If you call `initialize()` after you call `deinitialize()` then the software will hang up.
 This is an issue the `pico-sdk`. To work around this issue, use the
 `pico-sdk` `development` branch and patch per the discussion in [sdk issue #980](https://github.com/raspberrypi/pico-sdk/issues/980):
@@ -100,24 +131,9 @@ with
     }
 #endif
 ```
+### Changing the web pages does not cause the webserver to rebuild
+The web pages that the web server serves are stored in the `fsdata/fs` directory. If you change any web page or CSS file, you will need to re-run `cmake` to generate the fsdata/fsdata.c file that encodes the pages for the LwIP httpd app and run `make clean` before `make`. The build system should do this automatically, but it does not because I have not worked out how to get the dependencies correct.
 
-## On 13-dec-2022
-The `makefsdata` perl script that generates the SSI web page header does not recognize
-the `.shtml` extention that the LwIP http server requires to properly server up SSI
-pages. A quick fix is to edit the script which is found at
-`${PICO_SDK_PATH}/lib/lwip/src/apps/http/makefsdata/makefsdata`
-
-Replace
-
-```
-if($file =~ /\.html$/) {
-```
-with
-
-```
-if($file =~ /\.s?html?$/) {
-```
-See the discussion [here](https://github.com/krzmaz/lwip/commit/e15654409d14a238aec5ed4bd5516063938c9345)
 # Demo program features
 The demo prgram is designed to exercise features of the
 `pico-w-connection-manager` class, which is called "the class" below.
@@ -147,25 +163,29 @@ scan-obtained security type to flash in JSON format
 Commands `wifi-scan-connect`
 
 ## User-directed hidden SSID connect workflow
-1. The user recalls the last connected AP SSID info from flash and initializes Wi-Fi if required.
-2. User enters SSID, passphrase and security type (Open, WPA-PSK, WPA2-PSK) for the AP.
-3. The class stores the SSID, passphrase, and security type to flash in JSON format
-4. The class attempts to connect to the access point using the SSID info stored.
-5. If connection succeeds, the class stores the SSID info to a list of known APs
+1. User enters SSID, passphrase and security type (Open, WPA-PSK, WPA2-PSK) for the AP.
+2. The class stores the SSID, passphrase, and security type to flash in JSON format
+3. The class attempts to connect to the access point using the SSID info stored.
+4. If connection succeeds, the class stores the SSID info to a list of known APs
 
 Commands: `wifi-connect`
 ## Automatic connection
 1. The class recalls the last connected AP SSID info from flash and initializes Wi-Fi if required.
 2. The class attempts to connect to the access point using the SSID
 info recalled.
-3. If the connection fails, the class will cycle through the list of
-known APs until connection succeeds or the user interrupts the process.
 
 Commands: `wifi-autoconnect`
+
+Note: The demo program runs the equivalent of this command automatically at startup.
+
+## Force disconnection
+1. The class forces the link down if it is up, or it de-initializes and then initializes the WiFi system if the link is requesting a connection.
+
+Commands: `wifi-disconnect`
 
 ## Link loss reconnection
 1. The Wi-Fi was connected but the link went down due to AP shutdown, AP out of range, etc.
 2. The class and Wi-Fi hardware automatically reconnects when the AP is back online or in range again.
 
 Commands: none; the Pico-W will do this automatically. To cancel this
-behavior, you have to explicityly run `wifi-deinitialize` after link loss.
+behavior, you have to explicityly run `wifi-deinitialize` or `wifi-disconnect` after link loss

@@ -56,36 +56,69 @@ static void writeCharFn(EmbeddedCli *embeddedCli, char c)
     putchar(c);
 }
 
-
 // max length of the tags defaults to be 8 chars
 // LWIP_HTTPD_MAX_TAG_NAME_LEN
 const char * ssi_example_tags[] = {
-    "Hello",
-    "counter",
+    "led",
 };
 
-u16_t ssi_handler(int iIndex, char *pcInsert, int iInsertLen) {
-    size_t printed;
+enum {
+    SSI_LED_STATE
+};
+
+static u16_t ssi_handler(int iIndex, char *pcInsert, int iInsertLen)
+{
     switch (iIndex) {
-        case 0: /* "Hello" */
-            printed = snprintf(pcInsert, iInsertLen, "Hello user number %d!", rand());
+
+        case SSI_LED_STATE:
+            snprintf(pcInsert, iInsertLen, cyw43_arch_gpio_get(CYW43_WL_GPIO_LED_PIN)? "On" : "Off");
             break;
-        case 1: /* "counter" */
-        {
-            static int counter;
-            counter++;
-            printed = snprintf(pcInsert, iInsertLen, "%d", counter);
-        }
-            break;
-        default: /* unknown tag */
-            printed = 0;
+        default:
+            snprintf(pcInsert, iInsertLen, "N/A");
             break;
     }
-    LWIP_ASSERT("sane length", printed <= 0xFFFF);
-    return (u16_t)printed;
+
+    /* Tell the server how many characters to insert */
+    return (u16_t)strlen(pcInsert);
 }
 
-void ssi_init() {
+
+static const char *led_cgi_handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
+{
+    LWIP_UNUSED_ARG(iIndex);
+    LWIP_UNUSED_ARG(pcValue);
+    for (int idx = 0; idx < iNumParams; idx++) {
+        if (strcmp(pcParam[idx], "on") == 0) {
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+        } else if (strcmp(pcParam[idx], "off") == 0) {
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+        } else if (strcmp(pcParam[idx], "toggle") == 0) {
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, cyw43_arch_gpio_get(CYW43_WL_GPIO_LED_PIN) ? 0:1);
+        }
+    }
+    return "/index.shtml";
+}
+
+static const char *about_cgi_handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
+{
+    LWIP_UNUSED_ARG(iIndex);
+    LWIP_UNUSED_ARG(iNumParams);
+    LWIP_UNUSED_ARG(pcParam);
+    LWIP_UNUSED_ARG(pcValue);
+    return "/about.html";
+}
+
+
+static tCGI pCGIs[] = {
+    {"/led", (tCGIHandler) led_cgi_handler},
+    {"/about", (tCGIHandler) about_cgi_handler},
+};
+
+static void cgi_init() {
+    http_set_cgi_handlers(pCGIs, sizeof (pCGIs) / sizeof (pCGIs[0]));
+}
+
+static void ssi_init() {
     size_t idx;
     for (idx = 0; idx < LWIP_ARRAYSIZE(ssi_example_tags); idx++) {
         LWIP_ASSERT("tag too long for LWIP_HTTPD_MAX_TAG_NAME_LEN",
@@ -94,6 +127,7 @@ void ssi_init() {
 
     http_set_ssi_handler(ssi_handler, ssi_example_tags, LWIP_ARRAYSIZE(ssi_example_tags));
 }
+
 
 int main()
 {
@@ -130,6 +164,10 @@ int main()
     embeddedCliProcess(cli);
     // Get connected
     bool connected = false;
+    // If successfully loaded settings, attempt to autoconnect now.
+    if (wifi.load_settings()) {
+        wifi.autoconnect();
+    }
     while (!connected) {
         int c = getchar_timeout_us(0);
         if (c != PICO_ERROR_TIMEOUT) {
@@ -140,8 +178,9 @@ int main()
         connected = wifi.get_state() == wifi.CONNECTED;
     }
     // Initialize the webserver
-    httpd_init();
     ssi_init();
+    cgi_init();
+    httpd_init();
     // Continue processing commands and updating the wifi connection status
     while (1) {
         int c = getchar_timeout_us(0);

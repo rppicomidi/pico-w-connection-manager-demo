@@ -7,13 +7,24 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 pico_sdk_init()
 
-set(MAKE_FS_DATA_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/fsdata/makefsdata)
-message("Running makefsdata script")
-execute_process(COMMAND
-        perl ${MAKE_FS_DATA_SCRIPT}
-        COMMAND_ECHO STDOUT
-        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/fsdata
-        )
+set(FS_DATA_DIR ${CMAKE_CURRENT_LIST_DIR}/fsdata)
+set(MAKE_FS_DATA_SCRIPT ${FS_DATA_DIR}/makefsdata)
+
+add_custom_command(
+    OUTPUT ${FS_DATA_DIR}/custom_fsdata.c
+    COMMAND ${MAKE_FS_DATA_SCRIPT}
+    DEPENDS ${FS_DATA_DIR}/fs/index.shtml
+        ${FS_DATA_DIR}/fs/jindex.html
+        ${FS_DATA_DIR}/fs/about.html
+        ${FS_DATA_DIR}/fs/404.html
+        ${FS_DATA_DIR}/fs/css/style.css
+        ${FS_DATA_DIR}/fs/css/siimple.min.css
+    WORKING_DIRECTORY ${FS_DATA_DIR}
+)
+add_custom_target(run ALL
+    DEPENDS ${FS_DATA_DIR}/custom_fsdata.c)
+set_property(SOURCE ${PICO_SDK_PATH}/lib/lwip/src/apps/http/fs.c APPEND PROPERTY OBJECT_DEPENDS ${FS_DATA_DIR}/custom_fsdata.c)
+
 set(target_name pico-w-connection-manager-demo)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/pico-w-connection-manager)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/littlefs-lib)

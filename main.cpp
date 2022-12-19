@@ -31,8 +31,9 @@
 #include "pico_lfs_cli.h"
 #include "lwip/apps/httpd.h"
 #include "pico/cyw43_arch.h"
-
+#include "lwip/apps/fs.h"
 #include "main_lwipopts.h"
+#include "parson.h"
 
 static void onCommand(const char* name, char *tokens)
 {
@@ -108,10 +109,19 @@ static const char *about_cgi_handler(int iIndex, int iNumParams, char *pcParam[]
     return "/about.html";
 }
 
+static const char *jindex_cgi_handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
+{
+    LWIP_UNUSED_ARG(iIndex);
+    LWIP_UNUSED_ARG(iNumParams);
+    LWIP_UNUSED_ARG(pcParam);
+    LWIP_UNUSED_ARG(pcValue);
+    return "/jindex.html";
+}
 
 static tCGI pCGIs[] = {
     {"/led", (tCGIHandler) led_cgi_handler},
     {"/about", (tCGIHandler) about_cgi_handler},
+    {"/jindex", (tCGIHandler) jindex_cgi_handler},
 };
 
 static void cgi_init() {
@@ -128,6 +138,171 @@ static void ssi_init() {
     http_set_ssi_handler(ssi_handler, ssi_example_tags, LWIP_ARRAYSIZE(ssi_example_tags));
 }
 
+static void make_ajax_response_file_data(struct fs_file *file, const char* result, const char* content)
+{
+    std::string content_len = std::to_string(strlen(content) + 1);
+    std::string file_str = std::string("HTTP/1.0 ")+std::string(result) +
+            std::string("\nContent-Type: application/json\nContent-Length: ") +
+                content_len+std::string("\n\n") + std::string(content);
+    file->len = file_str.length();
+    char* data = new char[file->len];
+    strncpy(data, file_str.c_str(), file->len);
+    data[file->len] = '\0';
+    file->data = data;
+    file->index = file->len;
+    file->flags = FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_CUSTOM;
+}
+
+static const char* get_led_state_json_string(bool is_on)
+{
+    static const char* onstr = "{\"ledState\":\"On\"}";
+    static const char* offstr = "{\"ledState\":\"Off\"}";
+    return is_on ? onstr : offstr;
+}
+
+static const char* get_led_state_json()
+{
+    return get_led_state_json_string(cyw43_arch_gpio_get(CYW43_WL_GPIO_LED_PIN));
+}
+
+// Required by LWIP_HTTPD_CUSTOM_FILES
+int fs_open_custom(struct fs_file *file, const char *name)
+{
+    const char* OK_200 = "200 OK";
+    const char* Created_201 = "201 Created";
+    const char* url = "/ledState.json";
+    if (strncmp(url, name, strlen(url)) == 0) {
+        printf("got request for ledState\r\n");
+        make_ajax_response_file_data(file, OK_200, get_led_state_json());
+        return 1;
+    }
+    url = "/ledStatePost.json";
+    if (strncmp(url, name, strlen(url)) == 0) {
+        printf("got request for ledStatePost\r\n");
+        make_ajax_response_file_data(file, Created_201, get_led_state_json());
+        return 1;
+    }
+    return 0;
+}
+
+void fs_close_custom(struct fs_file *file)
+{
+    if (file->data) {
+        delete[] file->data;
+        file->data = NULL;
+    }
+}
+
+static void *current_connection;
+static void chardump(const char* buffer, size_t len)
+{
+    for (size_t idx=0; idx < len; idx++) {
+        if (std::isprint(buffer[idx])) {
+            printf("%c", buffer[idx]);
+        }
+        else {
+            printf(".");
+        }
+    }
+}
+static void hexdump(const char* buffer, size_t len)
+{
+    printf("Dump %u bytes\r\n", len);
+    size_t bytes_printed_on_line = 0;
+    size_t idx = 0;
+    for (; idx < len; idx++) {
+        printf("%02x ", buffer[idx]);
+        if (++bytes_printed_on_line == 16) {
+            char partial[16];
+            memcpy(partial, buffer+idx-15, 16);
+            printf("   | ");
+            chardump(partial, 16);
+            bytes_printed_on_line = 0;
+            printf("\r\n");
+        }
+    }
+    if (bytes_printed_on_line != 0) {
+        char partial[bytes_printed_on_line];
+        memcpy(partial, buffer+idx-bytes_printed_on_line, bytes_printed_on_line);
+        for (size_t idx=0; idx < 16-bytes_printed_on_line; idx++) {
+            printf("   ");
+        }
+        printf("   | ");
+        chardump(partial, bytes_printed_on_line);
+        printf("\r\n");
+    }
+}
+err_t httpd_post_begin(void *connection, const char *uri, const char *http_request, u16_t http_request_len,
+                            int content_len, char *response_uri, u16_t response_uri_len, u8_t *post_auto_wnd)
+{
+    LWIP_UNUSED_ARG(http_request);
+    LWIP_UNUSED_ARG(http_request_len);
+    LWIP_UNUSED_ARG(content_len);
+    //printf("Got POST message %u bytes content %d bytes\r\n", http_request_len, content_len);
+    //hexdump(http_request, http_request_len);
+    if (!memcmp(uri, "/ledStatePost.json", 11)) {
+        if (current_connection != connection) {
+            current_connection = connection;
+            /* default page is "login failed" */
+            snprintf(response_uri, response_uri_len, "/404.html");
+            /* e.g. for large uploads to slow flash over a fast connection, you should
+                manually update the rx window. That way, a sender can only send a full
+                tcp window at a time. If this is required, set 'post_aut_wnd' to 0.
+                We do not need to throttle upload speed here, so: */
+            *post_auto_wnd = 1;
+            return ERR_OK;
+        }
+    }
+    return ERR_VAL;
+}
+
+err_t httpd_post_receive_data (void *connection, struct pbuf *p)
+{
+    err_t result = ERR_VAL;
+    if (connection == current_connection) {
+        char* data = new char[p->tot_len];
+        char* buffer = static_cast<char*>(pbuf_get_contiguous(p, data, p->tot_len, p->tot_len, 0));
+        if (buffer != NULL) {
+            //printf("received POST data %u of %u bytes\r\n", p->len, p->tot_len);
+            JSON_Value* value = json_parse_string(buffer);
+            if (value != NULL) {
+                JSON_Object* object = json_value_get_object(value);
+                const char* led_state = json_object_get_string(object, "ledState");
+                if (led_state != NULL) {
+                    if (strncmp("On", led_state, 2) == 0) {
+                        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);
+                    }
+                    else if (strncmp("Off", led_state, 3) == 0) {
+                        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
+                    }
+                    else {
+                        printf("Unexpected ledState value %s\r\n", led_state);
+                    }
+                }
+                json_value_free(value);
+            }
+            else {
+                printf("value in POST not parsed as JSON\r\n");
+                hexdump(buffer, p->tot_len);
+            }
+        }
+        else {
+            printf("failed to get POST in buffer\r\n");
+        }
+        delete[] data;
+        result =  ERR_OK;
+    }
+    pbuf_free(p);
+    return result;
+}
+
+void httpd_post_finished (void *connection, char *response_uri, u16_t response_uri_len)
+{
+    if (connection == current_connection) {
+        snprintf(response_uri, response_uri_len, "/ledStatePost.json");
+        current_connection = NULL;
+    }
+}
 
 int main()
 {

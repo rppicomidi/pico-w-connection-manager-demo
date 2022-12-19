@@ -1,4 +1,4 @@
 build/
 .vscode/.cortex-debug.*
-fsdata/fsdata.c
+fsdata/custom_fsdata.c
 

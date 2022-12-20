@@ -10,7 +10,9 @@ with your own user interface. Use the `Pico_w_connection_manager_cli` Class
 as a guide. The code assumes a "super-loop" and does not use an RTOS.
 
 Once the connection to the AP is active, the demo program starts a webserver
-that allows you to turn the Pico W's on-board LED on or off.
+that allows you to turn the Pico W's on-board LED on or off. The program
+demonstrates a page that uses SSI and CGI to toggle the LED and a second
+page that uses Ajax to do the same thing.
 
 ![](doc/Pico-w-connection-manager-home.png)
 

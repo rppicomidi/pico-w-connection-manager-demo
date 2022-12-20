@@ -20,7 +20,9 @@ while($file = <FILES>) {
     if($incHttpHeader == 1) {
         open(HEADER, "> /tmp/header") || die $!;
         if($file =~ /404/) {
-            print(HEADER "HTTP/1.0 404 File not found\r\n");
+            print(HEADER "HTTP/1.0 404 Not found\r\n");
+        } elsif($file =~ /429/) {
+            print(HEADER "HTTP/1.0 429 Too Many Requests\r\n");
         } else {
             print(HEADER "HTTP/1.0 200 OK\r\n");
         }

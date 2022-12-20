@@ -33,13 +33,15 @@
 #include "pico/cyw43_arch.h"
 #include "lwip/apps/fs.h"
 #include "main_lwipopts.h"
-#include "parson.h"
+//#include "parson.h"
 
-
+#if 0
+// Use this function to discover what functions are called in ISR context
 static void print_icsr_active()
 {
     printf("active irq=%lu\r\n", 0x1F & *reinterpret_cast<volatile uint32_t *>(0xE000ED04));
 }
+#endif
 
 static void onCommand(const char* name, char *tokens)
 {
@@ -93,14 +95,23 @@ static u16_t ssi_handler(int iIndex, char *pcInsert, int iInsertLen)
 static const char *led_cgi_handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
 {
     LWIP_UNUSED_ARG(iIndex);
-    LWIP_UNUSED_ARG(pcValue);
     for (int idx = 0; idx < iNumParams; idx++) {
-        if (strcmp(pcParam[idx], "on") == 0) {
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-        } else if (strcmp(pcParam[idx], "off") == 0) {
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-        } else if (strcmp(pcParam[idx], "toggle") == 0) {
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, cyw43_arch_gpio_get(CYW43_WL_GPIO_LED_PIN) ? 0:1);
+        if (strcmp(pcParam[idx], "state") == 0) {
+            if (pcValue[idx][0] == '1') {
+                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+            }
+            else if (pcValue[idx][0] == '0') {
+                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+            }
+            else if (strcmp(pcValue[idx], "toggle") == 0) {
+                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, cyw43_arch_gpio_get(CYW43_WL_GPIO_LED_PIN) ? 0:1);
+            }
+            else {
+                printf("unknown state pcValue %s\r\n", pcValue[idx]);
+            }
+        }
+        else {
+            printf("unknown pcParam %s", pcParam[idx]);
         }
     }
     return "/index.shtml";
@@ -154,6 +165,7 @@ static void make_ajax_response_file_data(struct fs_file *file, const char* resul
         printf("make_ajax_response_file_data: response truncated\r\n");
     }
 #else
+    // don't allocate memory in an irq
     std::string content_len = std::to_string(strlen(content) + 1);
     std::string file_str = std::string("HTTP/1.0 ")+std::string(result) +
             std::string("\nContent-Type: application/json\nContent-Length: ") +
@@ -189,14 +201,14 @@ int fs_open_custom(struct fs_file *file, const char *name)
     const char* Created_201 = "201 Created";
     const char* url = "/ledState.json";
     if (strncmp(url, name, strlen(url)) == 0) {
-        printf("got request for ledState\r\n");
+        //printf("got request for ledState\r\n");
         make_ajax_response_file_data(file, OK_200, get_led_state_json());
         result = 1;
     }
     else {
         url = "/ledStatePost.json";
         if (strncmp(url, name, strlen(url)) == 0) {
-            printf("got request for ledStatePost\r\n");
+            //printf("got request for ledStatePost\r\n");
             make_ajax_response_file_data(file, Created_201, get_led_state_json());
             result = 1;
         }
@@ -205,17 +217,6 @@ int fs_open_custom(struct fs_file *file, const char *name)
     return result;
 }
 
-#if 0
-u8_t fs_canread_custom(struct fs_file *file)
-{
-    return 0;
-}
-
-u8_t fs_wait_read_custom(struct fs_file *file, fs_wait_cb callback_fn, void *callback_arg)
-{
-
-}
-#endif
 void fs_close_custom(struct fs_file *file)
 {
     #if 1
@@ -230,7 +231,7 @@ void fs_close_custom(struct fs_file *file)
     #endif
 }
 
-static void *current_connection;
+static void *current_connection = NULL;
 static void chardump(const char* buffer, size_t len)
 {
     for (size_t idx=0; idx < len; idx++) {
@@ -278,17 +279,20 @@ err_t httpd_post_begin(void *connection, const char *uri, const char *http_reque
     //printf("Got POST message %u bytes content %d bytes\r\n", http_request_len, content_len);
     //hexdump(http_request, http_request_len);
     if (!memcmp(uri, "/ledStatePost.json", 11)) {
-        if (current_connection != connection) {
-            current_connection = connection;
-            /* default page is "login failed" */
-            snprintf(response_uri, response_uri_len, "/404.html");
-            /* e.g. for large uploads to slow flash over a fast connection, you should
-                manually update the rx window. That way, a sender can only send a full
-                tcp window at a time. If this is required, set 'post_aut_wnd' to 0.
-                We do not need to throttle upload speed here, so: */
-            *post_auto_wnd = 1;
-            return ERR_OK;
-        }
+    if (current_connection != NULL) {
+        snprintf(response_uri, response_uri_len, "/429.html");
+    }
+    else  {
+        current_connection = connection;
+        /* default page is too many requests */
+        snprintf(response_uri, response_uri_len, "/429.html");
+        /* e.g. for large uploads to slow flash over a fast connection, you should
+            manually update the rx window. That way, a sender can only send a full
+            tcp window at a time. If this is required, set 'post_aut_wnd' to 0.
+            We do not need to throttle upload speed here, so: */
+        *post_auto_wnd = 1;
+        return ERR_OK;
+    }
     }
     return ERR_VAL;
 }
@@ -298,11 +302,12 @@ err_t httpd_post_receive_data (void *connection, struct pbuf *p)
     cyw43_arch_lwip_begin();
     err_t result = ERR_VAL;
     if (connection == current_connection) {
-        print_icsr_active();
-        char* data = new char[p->tot_len];
+        //char* data = new char[p->tot_len]; don't allocate memory on the heap in ISR
+        char data[p->tot_len];
         char* buffer = static_cast<char*>(pbuf_get_contiguous(p, data, p->tot_len, p->tot_len, 0));
         if (buffer != NULL) {
             //printf("received POST data %u of %u bytes\r\n", p->len, p->tot_len);
+#if 0 // parson allocates memory
             JSON_Value* value = json_parse_string(buffer);
             if (value != NULL) {
                 JSON_Object* object = json_value_get_object(value);
@@ -324,11 +329,22 @@ err_t httpd_post_receive_data (void *connection, struct pbuf *p)
                 printf("value in POST not parsed as JSON\r\n");
                 hexdump(buffer, p->tot_len);
             }
+#endif
+            if (strncmp(buffer, get_led_state_json_string(true), p->tot_len) == 0) {
+                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);
+            }
+            else if (strncmp(buffer, get_led_state_json_string(false), p->tot_len) == 0) {
+                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
+            }
+            else {
+                printf("Unexpected ledState value %s\r\n", buffer);
+                hexdump(buffer, p->tot_len);
+            }
         }
         else {
             printf("failed to get POST in buffer\r\n");
         }
-        delete[] data;
+        //delete[] data; don't allocate memory on the heap in ISR
         result =  ERR_OK;
     }
     pbuf_free(p);

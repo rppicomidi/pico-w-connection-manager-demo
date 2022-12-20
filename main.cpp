@@ -35,6 +35,12 @@
 #include "main_lwipopts.h"
 #include "parson.h"
 
+
+static void print_icsr_active()
+{
+    printf("active irq=%lu\r\n", 0x1F & *reinterpret_cast<volatile uint32_t *>(0xE000ED04));
+}
+
 static void onCommand(const char* name, char *tokens)
 {
     printf("Received command: %s\r\n",name);
@@ -140,6 +146,14 @@ static void ssi_init() {
 
 static void make_ajax_response_file_data(struct fs_file *file, const char* result, const char* content)
 {
+#if 1
+    static char data[1024];
+    size_t content_len = strlen(content) + 1;
+    file->len = snprintf(data, sizeof(data), "HTTP/1.0 %s\r\nContent-Type: application/json;charset=UTF-8\r\nContent-Length: %d+\r\n\r\n%s", result, content_len, content);
+    if ((size_t)file->len >= sizeof(data)) {
+        printf("make_ajax_response_file_data: response truncated\r\n");
+    }
+#else
     std::string content_len = std::to_string(strlen(content) + 1);
     std::string file_str = std::string("HTTP/1.0 ")+std::string(result) +
             std::string("\nContent-Type: application/json\nContent-Length: ") +
@@ -148,6 +162,7 @@ static void make_ajax_response_file_data(struct fs_file *file, const char* resul
     char* data = new char[file->len];
     strncpy(data, file_str.c_str(), file->len);
     data[file->len] = '\0';
+#endif
     file->data = data;
     file->index = file->len;
     file->flags = FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_CUSTOM;
@@ -168,29 +183,51 @@ static const char* get_led_state_json()
 // Required by LWIP_HTTPD_CUSTOM_FILES
 int fs_open_custom(struct fs_file *file, const char *name)
 {
+    cyw43_arch_lwip_begin();
+    int result = 0;
     const char* OK_200 = "200 OK";
     const char* Created_201 = "201 Created";
     const char* url = "/ledState.json";
     if (strncmp(url, name, strlen(url)) == 0) {
         printf("got request for ledState\r\n");
         make_ajax_response_file_data(file, OK_200, get_led_state_json());
-        return 1;
+        result = 1;
     }
-    url = "/ledStatePost.json";
-    if (strncmp(url, name, strlen(url)) == 0) {
-        printf("got request for ledStatePost\r\n");
-        make_ajax_response_file_data(file, Created_201, get_led_state_json());
-        return 1;
+    else {
+        url = "/ledStatePost.json";
+        if (strncmp(url, name, strlen(url)) == 0) {
+            printf("got request for ledStatePost\r\n");
+            make_ajax_response_file_data(file, Created_201, get_led_state_json());
+            result = 1;
+        }
     }
+    cyw43_arch_lwip_end();
+    return result;
+}
+
+#if 0
+u8_t fs_canread_custom(struct fs_file *file)
+{
     return 0;
 }
 
+u8_t fs_wait_read_custom(struct fs_file *file, fs_wait_cb callback_fn, void *callback_arg)
+{
+
+}
+#endif
 void fs_close_custom(struct fs_file *file)
 {
+    #if 1
+    LWIP_UNUSED_ARG(file);
+    #else
+    cyw43_arch_lwip_begin();
     if (file->data) {
         delete[] file->data;
         file->data = NULL;
     }
+    cyw43_arch_lwip_end();
+    #endif
 }
 
 static void *current_connection;
@@ -258,8 +295,10 @@ err_t httpd_post_begin(void *connection, const char *uri, const char *http_reque
 
 err_t httpd_post_receive_data (void *connection, struct pbuf *p)
 {
+    cyw43_arch_lwip_begin();
     err_t result = ERR_VAL;
     if (connection == current_connection) {
+        print_icsr_active();
         char* data = new char[p->tot_len];
         char* buffer = static_cast<char*>(pbuf_get_contiguous(p, data, p->tot_len, p->tot_len, 0));
         if (buffer != NULL) {
@@ -293,6 +332,7 @@ err_t httpd_post_receive_data (void *connection, struct pbuf *p)
         result =  ERR_OK;
     }
     pbuf_free(p);
+    cyw43_arch_lwip_end();
     return result;
 }
 
@@ -356,6 +396,7 @@ int main()
     ssi_init();
     cgi_init();
     httpd_init();
+
     // Continue processing commands and updating the wifi connection status
     while (1) {
         int c = getchar_timeout_us(0);

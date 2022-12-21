@@ -25,6 +25,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "pico/stdlib.h"
 #include "pico_w_connection_manager.h"
 #include "pico_w_connection_manager_cli.h"
@@ -360,6 +361,27 @@ void httpd_post_finished (void *connection, char *response_uri, u16_t response_u
     }
 }
 
+static void on_led_cmd(EmbeddedCli *cli, char *args, void *context)
+{
+    (void)cli; // unused parameter
+    (void)context;
+    size_t argc = embeddedCliGetTokenCount(args);
+    if (argc == 0) {
+        printf("LED state=%s\r\n", cyw43_arch_gpio_get(CYW43_WL_GPIO_LED_PIN) ? "On":"Off");
+    }
+    else if (argc == 1) {
+        if (strncmp("toggle", embeddedCliGetToken(args, 1), 6) == 0) {
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, !cyw43_arch_gpio_get(CYW43_WL_GPIO_LED_PIN));
+        }
+        else {
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN,atoi(embeddedCliGetToken(args, 1))!=0);
+        }
+    }
+    else {
+        printf("usage set-led <toggle|0 (off)|1 (on)>\r\n");
+    }
+}
+
 int main()
 {
     // Initialize the console
@@ -375,7 +397,7 @@ int main()
         .cmdBufferSize = 64,
         .historyBufferSize = 128,
         .maxBindingCount = static_cast<uint16_t>(rppicomidi::Pico_lfs_cli::get_num_commands() + 
-            rppicomidi::Pico_w_connection_manager_cli::get_num_commands()),
+            rppicomidi::Pico_w_connection_manager_cli::get_num_commands()+1),
         .cliBuffer = NULL,
         .cliBufferSize = 0,
         .enableAutoComplete = true,
@@ -387,6 +409,13 @@ int main()
     rppicomidi::Pico_w_connection_manager_cli wifi_cli(cli);
     rppicomidi::Pico_lfs_cli lfs_cli(cli);
     wifi_cli.setup_cli(&wifi);
+    assert(embeddedCliAddBinding(cli, {
+            "set-led",
+            "Set the state of the Pico W's LED; usage set-led <toggle|0 (off)|1 (on)>",
+            true,
+            nullptr,
+            on_led_cmd
+    }));
     printf("Cli is running.\r\n");
     printf("Type \"help\" for a list of commands\r\n");
     printf("Use backspace and tab to remove chars and autocomplete\r\n");

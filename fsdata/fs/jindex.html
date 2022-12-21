@@ -50,37 +50,36 @@
 
 		<script>
 			window.onload = function () {
-				var req = new XMLHttpRequest();
-				req.responseType = 'json';
-
+                console.log("Window loaded. Sending XMLHttpRequest() for ledState.json");
+				let req = new XMLHttpRequest();
+				req.open("GET", "/ledState.json", true);
 				req.onload = function() {
-					var state = this.readyState;
-					var respCode = req.status;
-					//console.log("req.onload called. readyState="+state+" status="+respCode);
+					let state = this.readyState;
+					let respCode = req.status;
+					console.log("req.onload called. readyState="+state+" status="+respCode);
 					if (state == this.DONE && respCode == 200) {
-						var data = this.response;
+						let data = JSON.parse(this.responseText);
 						//console.log("success:"+data.ledState);
 						document.getElementById('ledState').innerHTML=data.ledState;
 						document.getElementById('led-switch').checked = (data.ledState == 'On');
 					}
-				}
-				req.onerror = function(e) {
-					console.log("request.error called. Error="+e);
-				}
-				req.open("GET", "/ledState.json", true);
+				};
+				req.onerror = function() {
+					console.log("request.error called");
+				};
 				req.send();
 			};
 			function ledupdate() {
-				var req = new XMLHttpRequest();
+				let req = new XMLHttpRequest();
 				req.open("POST", "/ledStatePost.json", true);
 				req.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
 				req.onload = function() {
-					var state = this.readyState;
-					var respCode = req.status;
+					let state = this.readyState;
+					let respCode = req.status;
 					//console.log("POST req.onload called. readyState="+state+" status="+respCode);
 					if (state == this.DONE) {
 						if (respCode == 201) {
-							var data = JSON.parse(this.responseText);
+							let data = JSON.parse(this.responseText);
 							if (data != null) {
 								//console.log("success:"+data.ledState);
 								document.getElementById('ledState').innerHTML=data.ledState;
@@ -89,10 +88,14 @@
 						}
 						else {
 							// request was rejected; put the switch back
-							var ls = document.getElementById('ledState').innerHTML;
+							let ls = document.getElementById('ledState').innerHTML;
 							document.getElementById('led-switch').checked = (ls == 'On');
 							if (respCode == 429 || respCode == 404) {
-								console.log(this.responseText);
+								//console.log(this.responseText);
+                                // Replace the current page
+                                document.open();
+                                document.write(this.responseText);
+                                document.close();
 							}
 						}
 					}
@@ -100,14 +103,13 @@
 				req.onerror = function() {
 					//console.log("request.error called.");
 					// there was an error. Make sure the switch state and text is in sync
-					var ls = document.getElementById('ledState').innerHTML;
+					let ls = document.getElementById('ledState').innerHTML;
 					document.getElementById('led-switch').checked = (ls == 'On');
 				};
 				req.onabort = function() {
 					// there was an abort. Make sure the switch state and text is in sync
-					var ls = document.getElementById('ledState').innerHTML;
+					let ls = document.getElementById('ledState').innerHTML;
 					document.getElementById('led-switch').checked = (ls == 'On');
-
 				};
 				var data = document.getElementById('led-switch').checked ? {"ledState":"On"} : {"ledState":"Off"};
 				req.send(JSON.stringify(data));

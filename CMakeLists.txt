@@ -14,7 +14,7 @@ add_custom_command(
     OUTPUT ${FS_DATA_DIR}/custom_fsdata.c
     COMMAND ${MAKE_FS_DATA_SCRIPT}
     DEPENDS ${FS_DATA_DIR}/fs/index.shtml
-        ${FS_DATA_DIR}/fs/jindex.html
+        ${FS_DATA_DIR}/fs/aindex.shtml
         ${FS_DATA_DIR}/fs/about.html
         ${FS_DATA_DIR}/fs/404.html
         ${FS_DATA_DIR}/fs/429.html

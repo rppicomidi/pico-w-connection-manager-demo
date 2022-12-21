@@ -126,19 +126,19 @@ static const char *about_cgi_handler(int iIndex, int iNumParams, char *pcParam[]
     return "/about.html";
 }
 
-static const char *jindex_cgi_handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
+static const char *aindex_cgi_handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
 {
     LWIP_UNUSED_ARG(iIndex);
     LWIP_UNUSED_ARG(iNumParams);
     LWIP_UNUSED_ARG(pcParam);
     LWIP_UNUSED_ARG(pcValue);
-    return "/jindex.html";
+    return "/aindex.shtml";
 }
 
 static tCGI pCGIs[] = {
     {"/led", (tCGIHandler) led_cgi_handler},
     {"/about", (tCGIHandler) about_cgi_handler},
-    {"/jindex", (tCGIHandler) jindex_cgi_handler},
+    {"/aindex", (tCGIHandler) aindex_cgi_handler},
 };
 
 static void cgi_init() {

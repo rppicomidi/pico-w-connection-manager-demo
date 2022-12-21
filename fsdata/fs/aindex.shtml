@@ -12,7 +12,7 @@
 	<body> 
 		<ul class="navbar">
 			<li><a href="/">Home</a></li>
-			<li><a class="active" href="jindex">Ajax-Home</a></li>
+			<li><a class="active" href="aindex">Ajax-Home</a></li>
 			<li><a href="about">About</a></li>
 		</ul>
 		<div class="grid main">
@@ -36,7 +36,7 @@
 			<table class="table table-striped">
 				<tr>
 					<td><b>LED state:</b></td>
-					<td id="ledState">xxx</td>
+					<td id="ledState"><!--#led--></td>
 				</tr>
 			</table>
 
@@ -44,30 +44,16 @@
 			<p>This web page uses HTML, CSS and JavaScript to render the switch. In response to the onClick event,
 				the switch sends an Ajax POST request to the server that requests the LED to be on or off. The server uses the 
 				new state of the LED to send the new LED state encoded in JSON in the POST response. This state is used
-				to set the <code>"ledState"</code> text and the <code>checked</code> state of the switch.
+				to set the <code>"ledState"</code> text and the <code>checked</code> state of the switch. The server set the
+				initial value of <code>"ledState"</code> using SSI. The switch synchronizes to the initial <code>"ledState"</code>
+				in the <code>window.onload</code> function.
 			</p>
 		</div>
 
 		<script>
 			window.onload = function () {
-                console.log("Window loaded. Sending XMLHttpRequest() for ledState.json");
-				let req = new XMLHttpRequest();
-				req.open("GET", "/ledState.json", true);
-				req.onload = function() {
-					let state = this.readyState;
-					let respCode = req.status;
-					console.log("req.onload called. readyState="+state+" status="+respCode);
-					if (state == this.DONE && respCode == 200) {
-						let data = JSON.parse(this.responseText);
-						//console.log("success:"+data.ledState);
-						document.getElementById('ledState').innerHTML=data.ledState;
-						document.getElementById('led-switch').checked = (data.ledState == 'On');
-					}
-				};
-				req.onerror = function() {
-					console.log("request.error called");
-				};
-				req.send();
+				let ls = document.getElementById('ledState').innerHTML;
+				document.getElementById('led-switch').checked = (ls == 'On');
 			};
 			function ledupdate() {
 				let req = new XMLHttpRequest();

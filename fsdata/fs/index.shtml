@@ -12,7 +12,7 @@
 	<body> 
 		<ul class="navbar">
 			<li><a class="active" href="/">Home</a></li>
-			<li><a href="jindex">Ajax-Home</a></li>
+			<li><a href="aindex">Ajax-Home</a></li>
 			<li><a href="about">About</a></li>
 		</ul>
 		<div class="grid main">
@@ -59,7 +59,7 @@
 
 		<script>
 			window.onload = function () {
-				var ls = document.getElementById('ledState').innerHTML;
+				let ls = document.getElementById('ledState').innerHTML;
 				document.getElementById('led-switch').checked = (ls == 'On');
 			};
 			function ledupdate() {

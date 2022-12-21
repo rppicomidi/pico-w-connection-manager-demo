@@ -36,7 +36,7 @@
 			<table class="table table-striped">
 				<tr>
 					<td><b>LED state:</b></td>
-					<td id="ledState"><!--#led--></td>
+					<td id="ledState">xxx</td>
 				</tr>
 			</table>
 
@@ -44,9 +44,10 @@
 			<p>This web page uses HTML, CSS and JavaScript to render the switch. In response to the onClick event,
 				the switch sends an Ajax POST request to the server that requests the LED to be on or off. The server uses the 
 				new state of the LED to send the new LED state encoded in JSON in the POST response. This state is used
-				to set the <code>"ledState"</code> text and the <code>checked</code> state of the switch. The server set the
-				initial value of <code>"ledState"</code> using SSI. The switch synchronizes to the initial <code>"ledState"</code>
-				in the <code>window.onload</code> function.
+				to set the <code>"ledState"</code> text and the <code>checked</code> state of the switch. After the page
+                load and every second afterwards, web page sends a XHR GET to the server to get the current LED state.
+                You can use the <code>set-led</code> CLI command to change the LED state on the server and watch
+                the web page update.
 			</p>
 		</div>
 
@@ -95,9 +96,7 @@
 				}
 			};
 			window.onload = function () {
-				let ls = document.getElementById('ledState').innerHTML;
-				document.getElementById('led-switch').checked = (ls == 'On');
-				pollLedState.setup();
+				pollLedState.reqLedState();
 			};
 			function ledupdate() {
 				pollLedState.cancel();

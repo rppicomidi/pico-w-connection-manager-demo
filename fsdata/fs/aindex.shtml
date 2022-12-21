@@ -51,11 +51,56 @@
 		</div>
 
 		<script>
+			const pollLedState = {
+				reqLedState() {
+					this.req = new XMLHttpRequest();
+					this.req.onload = () => { if (this.req.readyState == this.req.DONE) {
+							let respCode = this.req.status;
+							if (respCode == 200) {
+								let data = JSON.parse(this.req.responseText);
+								let ls = document.getElementById('ledState').innerHTML;
+								if (ls != data.ledState) {
+									document.getElementById('ledState').innerHTML=data.ledState;
+									document.getElementById('led-switch').checked = (data.ledState == 'On');
+								}
+							}
+							this.req = undefined;
+							this.setup();
+						}
+					};
+					this.req.onerror = () => {
+						this.req = undefined;
+						this.setup();
+					};
+					this.req.onabort = () => {
+						this.req = undefined;
+					};
+					this.req.open("GET","/ledState.json", true);
+					this.req.send();
+					this.timeoutId = undefined;
+				},
+				setup() {
+					if (typeof this.timeoutId === 'number') {
+						this.cancel();
+					}
+					this.timeoutId = setTimeout(()=>{ this.reqLedState();}, 1000); // poll the LED state from the server one second from now.
+				},
+				cancel() {
+					if (this.timeoutId != undefined) {
+						clearTimeout(this.timeoutId);
+					}
+					if (this.req != undefined) {
+						this.req.abort();
+					}
+				}
+			};
 			window.onload = function () {
 				let ls = document.getElementById('ledState').innerHTML;
 				document.getElementById('led-switch').checked = (ls == 'On');
+				pollLedState.setup();
 			};
 			function ledupdate() {
+				pollLedState.cancel();
 				let req = new XMLHttpRequest();
 				req.open("POST", "/ledStatePost.json", true);
 				req.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
@@ -84,6 +129,7 @@
                                 document.close();
 							}
 						}
+						pollLedState.setup();
 					}
 				};
 				req.onerror = function() {
@@ -91,11 +137,13 @@
 					// there was an error. Make sure the switch state and text is in sync
 					let ls = document.getElementById('ledState').innerHTML;
 					document.getElementById('led-switch').checked = (ls == 'On');
+					pollLedState.setup();
 				};
 				req.onabort = function() {
 					// there was an abort. Make sure the switch state and text is in sync
 					let ls = document.getElementById('ledState').innerHTML;
 					document.getElementById('led-switch').checked = (ls == 'On');
+					pollLedState.setup();
 				};
 				var data = document.getElementById('led-switch').checked ? {"ledState":"On"} : {"ledState":"Off"};
 				req.send(JSON.stringify(data));

@@ -159,7 +159,7 @@ static void make_ajax_response_file_data(struct fs_file *file, const char* resul
 {
 #if 1
     static char data[1024];
-    size_t content_len = strlen(content) + 1;
+    size_t content_len = strlen(content);
     file->len = snprintf(data, sizeof(data), "HTTP/1.0 %s\r\nContent-Type: application/json;charset=UTF-8\r\nContent-Length: %d+\r\n\r\n%s", result, content_len, content);
     if ((size_t)file->len >= sizeof(data)) {
         printf("make_ajax_response_file_data: response truncated\r\n");

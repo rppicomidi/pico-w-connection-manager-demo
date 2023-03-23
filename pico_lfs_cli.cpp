@@ -22,6 +22,12 @@
  * SOFTWARE.
  * 
  */
+#ifdef NDEBUG
+// Need to do this here for release builds or no CLI commands will be added
+// All build variants except DEBUG define NDEBUG, which makes assert() macro generate
+// no code at all, which prevents some required code in here from executing
+#undef NDEBUG
+#endif
 #include "pico_lfs_cli.h"
 #include "pico_hal.h"
 rppicomidi::Pico_lfs_cli::Pico_lfs_cli(EmbeddedCli* cli_) : cli{cli_}
